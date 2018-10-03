@@ -33,7 +33,7 @@ Here is an example of how to configure the plugin.
 First, you need to register your application in Azure AD and get access tokens.
 Then, generate a self signed certificate to enable service-to-service calls and
 add the public key thumbprint in your Azure application manifest.
-Check [Microsoft documentation](https://docs.microsoft.com/en-us/office/office-365-management-api/get-started-with-office-365-management-apis)
+Check [Microsoft documentation](https://docs.microsoft.com/en-us/office/office-365-management-api/get-started-with-office-365-management-apis) for details.
 Once you have done this retrieve from Azure you client ID and Tenant information.
 
 In this example, we retrieve the last 12 minutes o365 Sharepoint logs every 10 minutes.
