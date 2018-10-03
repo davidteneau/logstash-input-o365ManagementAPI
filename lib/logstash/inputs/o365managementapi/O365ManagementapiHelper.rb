@@ -35,7 +35,9 @@ class O365ManagementapiHelper
 	end #initialize
 
 	def refresh_token_if_needed()
+		@logger.info("Token expires in #{@adal_response.expires_in} seconds")
 		if @adal_response.expires_in.to_i <= 0
+			 @logger.info("Token expired, acquiring new token.")
 			 response = @authentication_context.acquire_token_for_client('https://manage.office.com', @client_cred)
 			 case response
                                 when ADAL::SuccessResponse
@@ -46,6 +48,7 @@ class O365ManagementapiHelper
                                         "#{result.error} and error description: #{result.error_description}.")
                         end
 		elsif @adal_response.expires_in.to_i < 600
+			@logger.info("Token will expire soon, refreshing it.")
 			response = @authentication_context.acquire_token_with_refresh_token(@adal_response.refresh_token, @client_cred)
 			case response
 				when ADAL::SuccessResponse
@@ -84,13 +87,18 @@ class O365ManagementapiHelper
 		header = {"Authorization": "Bearer #{@adal_response.access_token}", "Content-Length": "0"}
     		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/content?contentType=#{@content_type}&startTime=#{start_time}&endTime=#{end_time}&PublisherIdentity=#{@publisherid}"
     		# Send request to get blobs uri
-		response = Requests.request("GET",request_uri, headers: header)
-    		while response.headers.include? 'nextpageuri'
-      			next_page = response.headers['nextpageuri'][0]
-      			process_page(response, logs)
-      			#use next page uri to get more blobs
-      			response = Requests.request("GET", "#{next_page}?PublisherIdentifier=#{@publisherid}", headers: header)
-    		end
+    		begin
+                        response = Requests.request("GET",request_uri, headers: header)
+			while response.headers.include? 'nextpageuri'
+                        	next_page = response.headers['nextpageuri'][0]
+                        	process_page(response, logs)
+                        	#use next page uri to get more blobs
+                        	response = Requests.request("GET", "#{next_page}?PublisherIdentifier=#{@publisherid}", headers: header)
+                	end
+                rescue StandardError => e
+                        @logger.error("Error getting page #{request_uri}\n#{e.message}")
+                        @logger.error(e.backtrace.inspect)
+                end
     		process_page(response, logs)
 		@logger.info("Processed #{logs.count} logs, start:#{start_time}, end:#{end_time}")
     		logs
@@ -142,7 +150,6 @@ class O365ManagementapiHelper
                 rescue StandardError => e
                         @logger.error("Error subscribing: #{e.message}")
                         @logger.error(e.backtrace.inspect)
-                        raise "Error subscribing: POST #{request_uri}, token validity: #{@adal_response.expires_in} sec"
      		end
 		if response.status == 200
       			@logger.info("sucessfully subscribed:\n#{response.body}")
@@ -163,7 +170,6 @@ class O365ManagementapiHelper
                 rescue StandardError => e
                         @logger.error("Error unsubscribing: #{e.message}")
                         @logger.error(e.backtrace.inspect)
-                        raise "Error unsubscribing: POST #{request_uri}, token validity: #{@adal_response.expires_in} sec"
                 end
 		if response.status == 200
       			return true

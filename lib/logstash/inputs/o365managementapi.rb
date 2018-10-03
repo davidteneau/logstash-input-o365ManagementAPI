@@ -18,8 +18,8 @@ require 'logstash/inputs/o365managementapi/O365ManagementapiHelper'
 #
 # In this example, we retrieve the last 12 minutes o365 Sharepoint logs every 10 minutes. 
 # It is very important to have overlapping query periods to make sure you are not missing logs.
-# This also means that some logs will be sent twice to the output. o365 log is mapped to document
-# id in order to prevent any duplication in elasticsearch.
+# This also means that some logs will be sent twice to the output. Make sure to map Document id
+# to log id in elasticsearch to prevent duplicates.
 #
 # [source,ruby]
 # ------------------------------------------------------------------------------
@@ -113,7 +113,7 @@ class LogStash::Inputs::O365managementapi < LogStash::Inputs::Base
 	logger.info("subscribed.")
     end
     if @schedule
-	logger.info("Schedule defined, intiating scheduler with schedule #{@schedule}")
+	logger.info("Schedule defined, initiating scheduler with schedule #{@schedule}")
 	@scheduler = Rufus::Scheduler.new(:max_work_threads => 1)
 	@scheduler.cron @schedule do
 		process(queue)
