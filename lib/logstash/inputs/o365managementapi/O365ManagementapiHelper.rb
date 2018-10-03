@@ -6,7 +6,7 @@ require 'parallel'
 
 class O365ManagementapiHelper
 	ADAL::TokenRequest::GrantType::JWT_BEARER = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
-	def initialize(tenant, tenantid, publisherid, clientid, pfx_path, pfx_password, content_type)
+	def initialize(tenant, tenantid, publisherid, clientid, pfx_path, pfx_password, content_type, logger)
 		@tenant = tenant
 		@tenantid = tenantid
 		@publisherid = publisherid
@@ -17,6 +17,7 @@ class O365ManagementapiHelper
 		@adal_response = nil
 		@authentication_context = nil
 		@client_cred = nil
+		@logger = logger
 		
 		pfx = OpenSSL::PKCS12.new(File.read(@pfx_path), @pfx_password)
 		authority = ADAL::Authority.new(ADAL::Authority::WORLD_WIDE_AUTHORITY, @tenant)
@@ -26,10 +27,10 @@ class O365ManagementapiHelper
 		@adal_response = @authentication_context.acquire_token_for_client('https://manage.office.com', @client_cred)
 		case @adal_response
 			when ADAL::SuccessResponse
-				puts "Successfully got Access Token. Expires in #{@adal_response.expires_in} seconds"
+				@logger.info("Successfully got Access Token. Expires in #{@adal_response.expires_in} seconds")
 			when ADAL::FailureResponse
-				raise 'Failed to authenticate with client credentials. Received error: ' \
-				"#{@adal_response.error}\n and error description: #{@adal_response.error_description}."
+				@logger.error('Failed to authenticate with client credentials. Received error: ' \
+				"#{@adal_response.error}\n and error description: #{@adal_response.error_description}.")
 		end
 	end #initialize
 
@@ -38,21 +39,21 @@ class O365ManagementapiHelper
 			 response = @authentication_context.acquire_token_for_client('https://manage.office.com', @client_cred)
 			 case response
                                 when ADAL::SuccessResponse
-                                        puts "Successfully got Access Token. Expires in #{result.expires_in} seconds"
+                                        @logger.info("Successfully got Access Token. Expires in #{result.expires_in} seconds)")
                                         @adal_response = result
                                 when ADAL::FailureResponse
-                                        raise 'Failed to authenticate with client credentials. Received error: ' \
-                                        "#{result.error} and error description: #{result.error_description}."
+                                        @logger.error('Failed to authenticate with client credentials. Received error: ' \
+                                        "#{result.error} and error description: #{result.error_description}.")
                         end
 		elsif @adal_response.expires_in.to_i < 600
 			response = @authentication_context.acquire_token_with_refresh_token(@adal_response.refresh_token, @client_cred)
 			case response
 				when ADAL::SuccessResponse
-                                	puts "Successfully refreshed token. Expires in #{result.expires_in} seconds"
+                                	@logger.info("Successfully refreshed token. Expires in #{result.expires_in} seconds")
                                 	@adal_response = result
                        		when ADAL::FailureResponse
-                                	raise 'Failed to refresh Token. Received error: ' \
-                                	"#{result.error} and error description: #{result.error_description}."
+                                	@logger.error('Failed to refresh Token. Received error: ' \
+                                	"#{result.error} and error description: #{result.error_description}.")
 			end
 		end
 		
@@ -63,7 +64,10 @@ class O365ManagementapiHelper
 		#add access token to header
 		header = {"Authorization": "Bearer #{@adal_response.access_token}"}
 		#poll to get available content
-		response = Requests.request("GET","https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/list", headers: header)
+		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/list"
+                response = Requests.request("GET", request_uri, headers: header)
+                @logger.info("Subscription list: \n#{response.json()}}")
+
 		response.json().each do |item|
 			if item["contentType"] == @content_type
 				return true
@@ -88,6 +92,7 @@ class O365ManagementapiHelper
       			response = Requests.request("GET", "#{next_page}?PublisherIdentifier=#{@publisherid}", headers: header)
     		end
     		process_page(response, logs)
+		@logger.info("Processed #{logs.count} logs, start:#{start_time}, end:#{end_time}")
     		logs
 	end
 	
@@ -132,9 +137,16 @@ class O365ManagementapiHelper
     		header = {"Authorization": "Bearer #{@adal_response.access_token}", "Content-Length": "0"}
     		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/start?contentType=#{@content_type}&PublisherIdentity=#{@publisherid}"
     		# start subscription
-    		response = Requests.request("POST",request_uri, headers: header)
-    		if response.code == 200
-      			return true
+    		begin
+                        response = Requests.request("POST",request_uri, headers: header)
+                rescue StandardError => e
+                        @logger.error("Error subscribing: #{e.message}")
+                        @logger.error(e.backtrace.inspect)
+                        raise "Error subscribing: POST #{request_uri}, token validity: #{@adal_response.expires_in} sec"
+     		end
+		if response.status == 200
+      			@logger.info("sucessfully subscribed:\n#{response.body}")
+			return true
     		end
     		#default : return false
     		false
@@ -146,8 +158,14 @@ class O365ManagementapiHelper
     		header = {"Authorization": "Bearer #{@adal_response.access_token}", "Content-Length": "0"}
     		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/stop?contentType=#{@content_type}&PublisherIdentity=#{@publisherid}"
     		# start subscription
-    		response = Requests.request("POST",request_uri, headers: header)
-    		if response.code == 200
+    		begin
+                        response = Requests.request("POST",request_uri, headers: header)
+                rescue StandardError => e
+                        @logger.error("Error unsubscribing: #{e.message}")
+                        @logger.error(e.backtrace.inspect)
+                        raise "Error unsubscribing: POST #{request_uri}, token validity: #{@adal_response.expires_in} sec"
+                end
+		if response.status == 200
       			return true
     		end
     		#default : return false

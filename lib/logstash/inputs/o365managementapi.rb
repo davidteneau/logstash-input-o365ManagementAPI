@@ -32,10 +32,23 @@ require 'logstash/inputs/o365managementapi/O365ManagementapiHelper'
 #     pfx_password => "secret"
 #     timerange => 12
 #     schedule => "*/10 * * * *"
-#     content_type => "Audit.Sharepoint"
+#     content_type => "Audit.SharePoint"
 #   }
 # }
 # ------------------------------------------------------------------------------
+#
+# Very important : 
+#
+# In order to prevent duplicates in elasticsearch, don't forget to specify 'Id' field as
+# document id :
+#
+# output {
+#  elasticsearch {
+#    hosts => "example.com"
+#    document_id => "%{[Id]}"
+#  }
+#}
+#
 
 class LogStash::Inputs::O365managementapi < LogStash::Inputs::Base
   config_name "o365managementapi"
