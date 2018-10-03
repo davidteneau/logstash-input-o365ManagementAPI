@@ -1,86 +1,69 @@
-# Logstash Plugin
+# Logstash input Plugin for Office 365 Audit logs
 
-This is a plugin for [Logstash](https://github.com/elastic/logstash).
+This is an input plugin for [Logstash](https://github.com/elastic/logstash).
 
-It is fully free and fully open source. The license is Apache 2.0, meaning you are pretty much free to use it however you want in whatever way.
+It is intented to download last minutes office 365 logs periodically.
 
-## Documentation
-
-Logstash provides infrastructure to automatically generate documentation for this plugin. We use the asciidoc format to write documentation so any comments in the source code will be first converted into asciidoc and then into html. All plugin documentation are placed under one [central location](http://www.elastic.co/guide/en/logstash/current/).
-
-- For formatting code or config example, you can use the asciidoc `[source,ruby]` directive
-- For more asciidoc formatting tips, see the excellent reference here https://github.com/elastic/docs#asciidoc-guide
-
-## Need Help?
-
-Need help? Try #logstash on freenode IRC or the https://discuss.elastic.co/c/logstash discussion forum.
-
-## Developing
-
-### 1. Plugin Developement and Testing
-
-#### Code
+#### Install
 - To get started, you'll need JRuby with the Bundler gem installed.
 
-- Create a new plugin or clone and existing from the GitHub [logstash-plugins](https://github.com/logstash-plugins) organization. We also provide [example plugins](https://github.com/logstash-plugins?query=example).
+- clone this repo :
+```sh
+git clone https://github.com/davidteneau/logstash-input-o365managementapi.git
+cd logstash-input-o365managementapi
+```
 
 - Install dependencies
 ```sh
 bundle install
 ```
 
-#### Test
-
-- Update your dependencies
-
+- Build the plugin gem
 ```sh
-bundle install
+gem build logstash-input-o365managementapi.gemspec
 ```
 
-- Run tests
-
-```sh
-bundle exec rspec
-```
-
-### 2. Running your unpublished Plugin in Logstash
-
-#### 2.1 Run in a local Logstash clone
-
-- Edit Logstash `Gemfile` and add the local plugin path, for example:
-```ruby
-gem "logstash-filter-awesome", :path => "/your/local/logstash-filter-awesome"
-```
-- Install plugin
-```sh
-bin/logstash-plugin install --no-verify
-```
-- Run Logstash with your plugin
-```sh
-bin/logstash -e 'filter {awesome {}}'
-```
-At this point any modifications to the plugin code will be applied to this local Logstash setup. After modifying the plugin, simply rerun Logstash.
-
-#### 2.2 Run in an installed Logstash
-
-You can use the same **2.1** method to run your plugin in an installed Logstash by editing its `Gemfile` and pointing the `:path` to your local plugin development directory or you can build the gem and install it using:
-
-- Build your plugin gem
-```sh
-gem build logstash-filter-awesome.gemspec
-```
 - Install the plugin from the Logstash home
 ```sh
-bin/logstash-plugin install /your/local/plugin/logstash-filter-awesome.gem
+bin/logstash-plugin install /path/to/logstash-input-o365managementapi/logstash-input-o365managementapi-1.0.1.gem
 ```
-- Start Logstash and proceed to test the plugin
+#### Usage:
+Here is an example of how to configure the plugin.
 
-## Contributing
+First, you need to register your application in Azure AD and get access tokens.
+Then, generate a self signed certificate to enable service-to-service calls and
+add the public key thumbprint in your Azure application manifest.
+Check [Microsoft documentation](https://docs.microsoft.com/en-us/office/office-365-management-api/get-started-with-office-365-management-apis)
+Once you have done this retrieve from Azure you client ID and Tenant information.
 
-All contributions are welcome: ideas, patches, documentation, bug reports, complaints, and even something you drew up on a napkin.
+In this example, we retrieve the last 12 minutes o365 Sharepoint logs every 10 minutes.
+It is very important to have overlapping query periods to make sure you are not missing logs.
+This also means that some logs will be sent twice to the output. Make sure to map Document id
+to log id in elasticsearch to prevent duplicates.
 
-Programming is not a required skill. Whatever you've seen about open source and maintainers or community members  saying "send patches or die" - you will not see that here.
+```Ruby
+input {
+   O365managementapi {
+     clientid => "XXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+     tenantid => "XXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+     tenant => "XXXX.onmicrosoft.com"
+     pfx_file => "o365.pfx"
+     pfx_password => "secret"
+     timerange => 12
+     schedule => "*/10 * * * *"
+     content_type => "Audit.SharePoint"
+   }
+}
+```
 
-It is more important to the community that you are able to contribute.
+Very important :
 
-For more information about contributing, see the [CONTRIBUTING](https://github.com/elastic/logstash/blob/master/CONTRIBUTING.md) file.
+ In order to prevent duplicates in elasticsearch, don't forget to specify 'Id' field as document id :
+```Ruby
+ output {
+  elasticsearch {
+    hosts => "example.com"
+    document_id => "%{[Id]}"
+  }
+}
+```
