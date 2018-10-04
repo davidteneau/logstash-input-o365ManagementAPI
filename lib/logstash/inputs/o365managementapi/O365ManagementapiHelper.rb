@@ -35,29 +35,32 @@ class O365ManagementapiHelper
 	end #initialize
 
 	def refresh_token_if_needed()
-		@logger.info("Token expires in #{@adal_response.expires_in} seconds")
-		if @adal_response.expires_in.to_i <= 0
+		expires_in = @adal_response.expires_on.to_i - Time.now.to_i
+		@logger.info("Token expires in #{expires_in} seconds")
+		if expires_in <= 0
 			 @logger.info("Token expired, acquiring new token.")
 			 response = @authentication_context.acquire_token_for_client('https://manage.office.com', @client_cred)
 			 case response
                                 when ADAL::SuccessResponse
-                                        @logger.info("Successfully got Access Token. Expires in #{result.expires_in} seconds)")
-                                        @adal_response = result
+                                        @logger.info("Successfully got Access Token. Expires in #{response.expires_in} seconds)")
+                                        @adal_response = response
                                 when ADAL::FailureResponse
                                         @logger.error('Failed to authenticate with client credentials. Received error: ' \
-                                        "#{result.error} and error description: #{result.error_description}.")
+                                        "#{response.error} and error description: #{response.error_description}.")
                         end
-		elsif @adal_response.expires_in.to_i < 600
+		elsif expires_in < 600
 			@logger.info("Token will expire soon, refreshing it.")
-			response = @authentication_context.acquire_token_with_refresh_token(@adal_response.refresh_token, @client_cred)
+			response = @authentication_context.acquire_token_with_refresh_token(@adal_response.refresh_token, @client_cred, 'https://manage.office.com')
 			case response
 				when ADAL::SuccessResponse
-                                	@logger.info("Successfully refreshed token. Expires in #{result.expires_in} seconds")
-                                	@adal_response = result
+                                	@logger.info("Successfully refreshed token. Expires in #{response.expires_in} seconds")
+                                	@adal_response = response
                        		when ADAL::FailureResponse
                                 	@logger.error('Failed to refresh Token. Received error: ' \
-                                	"#{result.error} and error description: #{result.error_description}.")
+                                	"#{response.error} and error description: #{response.error_description}.")
 			end
+		else
+                        @logger.info("Token validity is ok, no need to refresh it.")
 		end
 		
 	end #refresh_token_if_needed()
