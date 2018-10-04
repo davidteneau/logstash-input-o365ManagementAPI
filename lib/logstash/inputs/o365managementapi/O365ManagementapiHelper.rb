@@ -38,7 +38,7 @@ class O365ManagementapiHelper
 		expires_in = @adal_response.expires_on.to_i - Time.now.to_i
 		@logger.info("Token expires in #{expires_in} seconds")
 		if expires_in <= 0
-			 @logger.info("Token expired, acquiring new token.")
+			 @logger.info("Token expired, or about to expire. Acquiring new token.")
 			 response = @authentication_context.acquire_token_for_client('https://manage.office.com', @client_cred)
 			 case response
                                 when ADAL::SuccessResponse
@@ -48,17 +48,6 @@ class O365ManagementapiHelper
                                         @logger.error('Failed to authenticate with client credentials. Received error: ' \
                                         "#{response.error} and error description: #{response.error_description}.")
                         end
-		elsif expires_in < 600
-			@logger.info("Token will expire soon, refreshing it.")
-			response = @authentication_context.acquire_token_with_refresh_token(@adal_response.refresh_token, @client_cred, 'https://manage.office.com')
-			case response
-				when ADAL::SuccessResponse
-                                	@logger.info("Successfully refreshed token. Expires in #{response.expires_in} seconds")
-                                	@adal_response = response
-                       		when ADAL::FailureResponse
-                                	@logger.error('Failed to refresh Token. Received error: ' \
-                                	"#{response.error} and error description: #{response.error_description}.")
-			end
 		else
                         @logger.info("Token validity is ok, no need to refresh it.")
 		end
