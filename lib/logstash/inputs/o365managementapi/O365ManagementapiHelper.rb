@@ -27,29 +27,29 @@ class O365ManagementapiHelper
 		@adal_response = @authentication_context.acquire_token_for_client('https://manage.office.com', @client_cred)
 		case @adal_response
 			when ADAL::SuccessResponse
-				@logger.info("Successfully got Access Token. Expires in #{@adal_response.expires_in} seconds")
+				@logger.info("[#{@content_type}] Successfully got Access Token. Expires in #{@adal_response.expires_in} seconds")
 			when ADAL::FailureResponse
-				@logger.error('Failed to authenticate with client credentials. Received error: ' \
+				@logger.error("[#{@content_type}] Failed to authenticate with client credentials. Received error: " \
 				"#{@adal_response.error}\n and error description: #{@adal_response.error_description}.")
 		end
 	end #initialize
 
 	def refresh_token_if_needed()
 		expires_in = @adal_response.expires_on.to_i - Time.now.to_i
-		@logger.info("Token expires in #{expires_in} seconds")
+		@logger.info("[#{@content_type}] Token expires in #{expires_in} seconds")
 		if expires_in <= 0
-			 @logger.info("Token expired, or about to expire. Acquiring new token.")
+			 @logger.info("[#{@content_type}] Token expired, or about to expire. Acquiring new token.")
 			 response = @authentication_context.acquire_token_for_client('https://manage.office.com', @client_cred)
 			 case response
                                 when ADAL::SuccessResponse
-                                        @logger.info("Successfully got Access Token. Expires in #{response.expires_in} seconds)")
+                                        @logger.info("[#{@content_type}] Successfully got Access Token. Expires in #{response.expires_in} seconds)")
                                         @adal_response = response
                                 when ADAL::FailureResponse
-                                        @logger.error('Failed to authenticate with client credentials. Received error: ' \
+                                        @logger.error("[#{@content_type}] Failed to authenticate with client credentials. Received error: " \
                                         "#{response.error} and error description: #{response.error_description}.")
                         end
 		else
-                        @logger.info("Token validity is ok, no need to refresh it.")
+                        @logger.info("[#{@content_type}] Token validity is ok, no need to refresh it.")
 		end
 		
 	end #refresh_token_if_needed()
@@ -61,7 +61,7 @@ class O365ManagementapiHelper
 		#poll to get available content
 		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/list"
                 response = Requests.request("GET", request_uri, headers: header)
-                @logger.info("Subscription list: \n#{response.json()}}")
+                @logger.info("[#{@content_type}] Subscription list: \n#{response.json()}}")
 
 		response.json().each do |item|
 			if item["contentType"] == @content_type
@@ -88,11 +88,11 @@ class O365ManagementapiHelper
                         	response = Requests.request("GET", "#{next_page}?PublisherIdentifier=#{@publisherid}", headers: header)
                 	end
                 rescue StandardError => e
-                        @logger.error("Error getting page #{request_uri}\n#{e.message}")
+                        @logger.error("[#{@content_type}] Error getting page #{request_uri}\n#{e.message}")
                         @logger.error(e.backtrace.inspect)
                 end
     		process_page(response, logs)
-		@logger.info("Processed #{logs.count} logs, start:#{start_time}, end:#{end_time}")
+		@logger.info("[#{@content_type}] Processed #{logs.count} logs, start:#{start_time}, end:#{end_time}")
     		logs
 	end
 	
@@ -125,9 +125,9 @@ class O365ManagementapiHelper
       				end
 			end
 		rescue StandardError => e
-			puts "Error retreiving blob content: #{e.message}"
-			puts e.backtrace.inspect
-			puts "URI: #{request_uri}"
+			@logger.error("[#{@content_type}] Error retreiving blob content: #{e.message}")
+			@logger.error("[#{@content_type}] " + e.backtrace.inspect)
+			@logger.error("[#{@content_type}]  URI: #{request_uri}")
 		end
 	end
 	
@@ -140,11 +140,11 @@ class O365ManagementapiHelper
     		begin
                         response = Requests.request("POST",request_uri, headers: header)
                 rescue StandardError => e
-                        @logger.error("Error subscribing: #{e.message}")
-                        @logger.error(e.backtrace.inspect)
+                        @logger.error("[#{@content_type}] Error subscribing: #{e.message}")
+                        @logger.error("[#{@content_type}] " + e.backtrace.inspect)
      		end
 		if response.status == 200
-      			@logger.info("sucessfully subscribed:\n#{response.body}")
+      			@logger.info("[#{@content_type}] sucessfully subscribed:\n#{response.body}")
 			return true
     		end
     		#default : return false
@@ -160,8 +160,8 @@ class O365ManagementapiHelper
     		begin
                         response = Requests.request("POST",request_uri, headers: header)
                 rescue StandardError => e
-                        @logger.error("Error unsubscribing: #{e.message}")
-                        @logger.error(e.backtrace.inspect)
+                        @logger.error("[#{@content_type}] Error unsubscribing: #{e.message}")
+                        @logger.error("[#{@content_type}] " + e.backtrace.inspect)
                 end
 		if response.status == 200
       			return true

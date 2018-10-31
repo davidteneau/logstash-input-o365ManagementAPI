@@ -106,21 +106,21 @@ class LogStash::Inputs::O365managementapi < LogStash::Inputs::Base
     sleep(2)
     #Manage subscription
     subscribed = @helper.subscribed()
-    logger.info("Already subscribed? #{subscribed}")
+    logger.info("[#{@content_type}] Already subscribed? #{subscribed}")
     unless subscribed
-        logger.info("subscribing...")
+        logger.info("[#{@content_type}] subscribing...")
 	@helper.subscribe
-	logger.info("subscribed.")
+	logger.info("[#{@content_type}] subscribed.")
     end
     if @schedule
-	logger.info("Schedule defined, initiating scheduler with schedule #{@schedule}")
+	logger.info("[#{@content_type}] Schedule defined, initiating scheduler with schedule #{@schedule}")
 	@scheduler = Rufus::Scheduler.new(:max_work_threads => 1)
 	@scheduler.cron @schedule do
 		process(queue)
 	end
 	@scheduler.join
     else
-	logger.info("no scheduler defined, running once.")
+	logger.info("[#{@content_type}] no scheduler defined, running once.")
       	process(queue)
     end
   end # def run
