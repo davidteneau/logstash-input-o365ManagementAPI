@@ -77,7 +77,7 @@ class O365ManagementapiHelper
 		logs = Array.new
 		#add access token to header
 		header = {"Authorization": "Bearer #{@adal_response.access_token}", "Content-Length": "0"}
-    		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/content?contentType=#{@content_type}&startTime=#{start_time}&endTime=#{end_time}&PublisherIdentity=#{@publisherid}"
+    		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/content?contentType=#{@content_type}&startTime=#{start_time}&endTime=#{end_time}&PublisherIdentifier=#{@publisherid}"
     		# Send request to get blobs uri
     		begin
                         response = Requests.request("GET",request_uri, headers: header)
@@ -111,7 +111,7 @@ class O365ManagementapiHelper
 	
    	# Process logs of one blob. Private Method
 	def process_blob(uri, logs)
-		request_uri = "#{uri}?PublisherIdentity=#{@publisherid}"
+		request_uri = "#{uri}?PublisherIdentifier=#{@publisherid}"
 		header = {"Authorization": "Bearer #{@adal_response.access_token}", "Content-Length": "0"}
 	 	#puts "header: #{header}" 
     		#poll to get available content
@@ -135,7 +135,7 @@ class O365ManagementapiHelper
   	def subscribe()
      		#add access token to header
     		header = {"Authorization": "Bearer #{@adal_response.access_token}", "Content-Length": "0"}
-    		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/start?contentType=#{@content_type}&PublisherIdentity=#{@publisherid}"
+    		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/start?contentType=#{@content_type}&PublisherIdentifier=#{@publisherid}"
     		# start subscription
     		begin
                         response = Requests.request("POST",request_uri, headers: header)
@@ -155,7 +155,7 @@ class O365ManagementapiHelper
   	def unsubscribe()
      		#add access token to header
     		header = {"Authorization": "Bearer #{@adal_response.access_token}", "Content-Length": "0"}
-    		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/stop?contentType=#{@content_type}&PublisherIdentity=#{@publisherid}"
+    		request_uri = "https://manage.office.com/api/v1.0/#{@tenantid}/activity/feed/subscriptions/stop?contentType=#{@content_type}&PublisherIdentifier=#{@publisherid}"
     		# start subscription
     		begin
                         response = Requests.request("POST",request_uri, headers: header)
