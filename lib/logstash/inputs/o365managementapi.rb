@@ -86,7 +86,15 @@ class LogStash::Inputs::O365managementapi < LogStash::Inputs::Base
   # There is no schedule by default. If no schedule is given, then the query is run
   # exactly once.
   config :schedule, :validate => :string
-  
+ 
+  # Used for one-time 24h data port. If specified, timerange is ignored. If a schedule is specified, this parameter is ignored.
+  # for example: "2018-11-07"
+  config :import_date, :validate =>:string
+
+  # Used for one-time 24h data port. If specified, timerange is ignored. If a schedule is specified, this parameter is ignored.
+  # for example: 30
+  config :days_to_import, :validate => :number, :default => 1
+ 
   # Content type. Can be "Audit.AzureActiveDirectory", "Audit.Exchange", "Audit.SharePoint", "Audit.General" or "DLP.All"
   # for more information on content types see https://docs.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-reference
   config :content_type, :validate => :string, :required => true
@@ -127,15 +135,35 @@ class LogStash::Inputs::O365managementapi < LogStash::Inputs::Base
 
   private
   def process(queue)
-	now = Time.now.utc
-	start = now - (@timerange*60)
-	start_time = start.strftime("%Y-%m-%dT%H:%M")
-	end_time = now.strftime("%Y-%m-%dT%H:%M")
-	logs = @helper.get_logs(start_time, end_time)
-	logs.each do |log|
-		event = LogStash::Event.new(log)
-		decorate(event)
-		queue << event
+	start_time = ""
+	end_time = ""
+	#one time import, by 24h querries
+	if !@schedule and @import_date
+		$i = @days_to_import - 1
+		while $i >= 0
+			end_ = DateTime.strptime(@import_date + "T23:59", "%Y-%m-%dT%H:%M") - $i
+			start = DateTime.strptime(@import_date + "T23:59", "%Y-%m-%dT%H:%M") - $i - 1
+			start_time = start.strftime("%Y-%m-%dT%H:%M")
+			end_time = end_.strftime("%Y-%m-%dT%H:%M")
+			logs = @helper.get_logs(start_time, end_time)
+                	logs.each do |log|
+                        	event = LogStash::Event.new(log)
+                        	decorate(event)
+                        	queue << event
+                	end
+			$i -= 1	
+		end
+	else
+		now = Time.now.utc
+		start = now - (@timerange*60)
+		start_time = start.strftime("%Y-%m-%dT%H:%M")
+		end_time = now.strftime("%Y-%m-%dT%H:%M")
+		logs = @helper.get_logs(start_time, end_time)
+		logs.each do |log|
+			event = LogStash::Event.new(log)
+			decorate(event)
+			queue << event
+		end
 	end
   end # process(queue)
   
